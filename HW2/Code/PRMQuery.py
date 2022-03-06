@@ -47,12 +47,17 @@ for i in range(len(prmVertices)):
 
 
 activenodes= neighInit
-bestscore=0
+bestscore=0  # the distance between a node and the goal
 
+# Starting from neighbors of qInit, find a path from any node in neighInit
+# to any node in neighGoal. For each iteration, we iterate all the unvisted
+# neighbors of all the nodes in the current expansion set, activenodes, and
+# then choose one node that has the least distance to qGoal and add it to
+# the expansion set. Stop if the expansion set contain any neighbor of qGoal
 while bestscore<1000 and not any([g in activenodes for g in neighGoal]):
 	bestscore=1000
 	for i in range(len(activenodes)):
-		for j in range(len(prmEdges[activenodes[i]])):
+		for j in range(len(prmEdges[activenodes[i]])):  # iterate each edge of the current node activenodes[i]
 			if prmEdges[activenodes[i]][j] not in activenodes:
 				if heuristic[prmEdges[activenodes[i]][j]]<bestscore:
 					bestscore=heuristic[prmEdges[activenodes[i]][j]]
@@ -83,7 +88,7 @@ for i in range(len(plan)):
 MyPlan.append(qGoal)
 
 
-
+# V-REP interface
 robot=vpi.vBot()
 robot.connect()
 
@@ -91,4 +96,3 @@ for q in MyPlan:
 	robot.move(q)
 
 robot.destroy()
-
