@@ -21,6 +21,7 @@ def get_azure_kinect_rgb_image(cv_bridge, topic='/rgb/image_raw'):
     except CvBridgeError as e:
         print(e)
     
+    print("Retrieved RGB image")
     return rgb_cv_image
 
 def get_azure_kinect_depth_image(cv_bridge, topic='/depth_to_rgb/image_raw'):
@@ -33,6 +34,7 @@ def get_azure_kinect_depth_image(cv_bridge, topic='/depth_to_rgb/image_raw'):
     except CvBridgeError as e:
         print(e)
     
+    print("Retrieved depth image")
     return depth_cv_image
 
 def get_realsense_rgb_image(cv_bridge, topic='/camera/color/image_raw'):
