@@ -25,7 +25,7 @@ cv2.setTrackbarPos('VMax', 'image', 255)
 hMin = sMin = vMin = hMax = sMax = vMax = 0
 phMin = psMin = pvMin = phMax = psMax = pvMax = 0
 
-img = cv2.imread('rgb.png')
+img = cv2.imread('blue_bottle.png')
 output = img
 waitTime = 33
 
@@ -60,7 +60,8 @@ while(1):
         pvMax = vMax
 
     # Display output image
-    cv2.imshow('image',output)
+    resize = cv2.resize(output, (1024,768))
+    cv2.imshow('image',resize)
 
     # Wait longer to prevent freeze for videos.
     if cv2.waitKey(waitTime) & 0xFF == ord('q'):
