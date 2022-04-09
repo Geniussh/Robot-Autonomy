@@ -6,11 +6,12 @@ from cv_bridge import CvBridge
 from autolab_core import RigidTransform, Point
 from perception import CameraIntrinsics
 from utils import *
+from RobotUtil import *
 
 AZURE_KINECT_INTRINSICS = 'calib/azure_kinect.intr'
 AZURE_KINECT_EXTRINSICS = 'calib/azure_kinect_overhead/azure_kinect_overhead_to_world.tf'
 
-cup_world = [0.5, 0, 0]
+cup_world = [0.4, 0, 0]
 
 rLower = np.array([160,59,20])
 rUpper = np.array([179,255,255])
@@ -112,7 +113,7 @@ if __name__ == '__main__':
     center = find_drink(rgb_image, gLower, gUpper)
 
     object_z_height = 0.2
-    intermediate_pose_z_height = 0.4
+    # intermediate_pose_z_height = 0.4
 
     object_center_point_in_world = get_object_center_point_in_world(center[0],
                                                                     center[1],
@@ -120,13 +121,12 @@ if __name__ == '__main__':
                                                                     azure_kinect_to_world_transform)
 
     object_center_pose = fa.get_pose()
-    Ry = RigidTransform(rotation=RigidTransform.y_axis_rotation(np.deg2rad(90)), from_frame='franka_tool', to_frame='franka_tool')
-    object_center_pose = object_center_pose * Ry
+    object_center_pose.rotation = object_center_pose.rotation @ np.array([[0,1,0], [0,0,-1], [-1,0,0]])
     object_center_pose.translation = [object_center_point_in_world[0], object_center_point_in_world[1], object_z_height]
 
     intermediate_robot_pose = object_center_pose.copy()
-    intermediate_robot_pose.translation = [object_center_point_in_world[0], object_center_point_in_world[1], intermediate_pose_z_height]
-    fa.goto_pose(intermediate_robot_pose)
+    intermediate_robot_pose.translation = [object_center_point_in_world[0], object_center_point_in_world[1] - 0.1, object_z_height]
+    fa.goto_pose(intermediate_robot_pose, 5)
     
     #intermediate 1
     # intermediate_robot_pose = fa.get_pose()
@@ -146,24 +146,26 @@ if __name__ == '__main__':
     #Close Gripper
     fa.goto_gripper(0.045, grasp=True, force=10.0)
 
-    #Move to intermediate robot pose
-    fa.goto_pose(intermediate_robot_pose)
+    #Lift
+    lift_pose = fa.get_pose()
+    lift_pose.translation[2] += 0.2
+    fa.goto_pose(lift_pose)
 
     #Move to cup intermediate
-    cup_intermediate_pose = intermediate_robot_pose.copy()
-    cup_intermediate_pose.translation[:2] = [cup_world[0], cup_world[1] + 0.1]
+    cup_intermediate_pose = fa.get_pose()
+    cup_intermediate_pose.translation[:2] = [cup_world[0] - 0.1, cup_world[1]]
     fa.goto_pose(cup_intermediate_pose)
 
     #Move to cup
     cup_pose = cup_intermediate_pose.copy()
     cup_pose.translation[:2] = cup_world[:2]
-    R = RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(180)), from_frame='franka_tool', to_frame='franka_tool')
+    R = RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(179)), from_frame='franka_tool', to_frame='franka_tool')
     cup_pose = cup_pose * R
     fa.goto_pose(cup_pose, 5, force_thresholds=[10, 10, 20, 10, 10, 10], buffer_time=5)
 
     #Return
     fa.goto_pose(cup_intermediate_pose)
-    fa.goto_pose(intermediate_robot_pose)
+    fa.goto_pose(lift_pose)
     fa.goto_pose(object_center_pose, 5, force_thresholds=[10, 10, 20, 10, 10, 10])
 
     print('Opening Grippers')
