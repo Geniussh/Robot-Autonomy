@@ -1,17 +1,16 @@
-from frankapy import FrankaArm
-import numpy as np
-import argparse
+#!/usr/bin/env python
+
+import rospy
+from message_ui.msg import sent_recipe
+from message_ui.msg import reply_msg
+import time
+from test_pick_bottle import *
+from utils import *
 import cv2
 from cv_bridge import CvBridge
 from autolab_core import RigidTransform, Point
 from perception import CameraIntrinsics
-from utils import *
-from RobotUtil import *
-
-AZURE_KINECT_INTRINSICS = 'calib/azure_kinect.intr'
-AZURE_KINECT_EXTRINSICS = 'calib/azure_kinect_overhead/azure_kinect_overhead_to_world.tf'
-
-cup_world = [0.4, 0, 0]
+from frankapy import FrankaArm
 
 rLower = np.array([160,59,20])
 rUpper = np.array([179,255,255])
@@ -22,159 +21,92 @@ gUpper = np.array([83,255,255])
 bLower = np.array([102,7,28])
 bUpper = np.array([111,196,255])
 
-def define_borders(img):
-    border = []
-    
-    def drawBorder(action, x, y, flags, param):
-        if action == cv2.EVENT_LBUTTONDOWN:
-           param.append([x,y])
-        elif action == cv2.EVENT_LBUTTONUP:
-            param.append([x,y])
+
+class Test(object):
+    def __init__(self):
+        self.pub = rospy.Publisher("reply_msg", reply_msg, queue_size=1000)
+        rospy.Subscriber('sent_recipe', sent_recipe, self.start_mixing_cb)
+        self.status = reply_msg()
+        rospy.on_shutdown(self.shutdownhook)
+
+        print('Starting robot')
+        self.fa = FrankaArm()    
+
+        print('Opening Grippers')
+        #Open Gripper
+        self.fa.open_gripper()
+
+        #Reset Pose
+        self.fa.reset_pose() 
+        #Reset Joints
+        self.fa.reset_joints()
+
+        cv_bridge = CvBridge()
+        self.azure_kinect_intrinsics = CameraIntrinsics.load('calib/azure_kinect.intr')
+        self.azure_kinect_to_world_transform = RigidTransform.load('calib/azure_kinect_overhead/azure_kinect_overhead_to_world.tf')    
+
+        self.azure_kinect_rgb_image = get_azure_kinect_rgb_image(cv_bridge)
+        self.azure_kinect_depth_image = get_azure_kinect_depth_image(cv_bridge)
+
+        cv2.imwrite('rgb.png', self.azure_kinect_rgb_image)
+        cv2.imwrite('depth.png', self.azure_kinect_depth_image)
+
+        # border = define_borders(azure_kinect_rgb_image)
+        # print(border)
+        border = [[389, 171], [1635, 875]]
+        mask = np.zeros(self.azure_kinect_rgb_image.shape[:2], np.uint8)
+        mask[border[0][1]:border[1][1], border[0][0]:border[1][0]] = 255
+        self.rgb_image = cv2.bitwise_and(self.azure_kinect_rgb_image, self.azure_kinect_rgb_image, mask=mask)
+        self.cup_world = [0.45, 0, 0]  # TODO: record a fixed position
+
+
+    def start_mixing_cb(self, msg):
+        self.status.message = "Franka starts making your drink..."
+        self.pub.publish(self.status)
+
+        object_z_height = 0.19
+        # Testing only. Should be replaced by calling franka
         
-    cv2.namedWindow('image')
-    cv2.imshow('image', img)
-    cv2.setMouseCallback('image', drawBorder, border)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+        initial_pose = self.fa.get_pose().copy()
 
-    return border
+        if msg.Blue > 0:
+            print("Adding Blue Wine")
+            center = find_drink(self.rgb_image, bLower, bUpper)
+            pick_up_bottle(msg.Blue, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0, self.cup_world)
+            # self.fa.reset_joints()
 
-def find_drink(rgb_image, lower, upper):
-    hsv = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, lower, upper)
-    mask = cv2.dilate(mask, np.ones((5,5), np.uint8), iterations=1)
-    mask = cv2.erode(mask, np.ones((5,5), np.uint8), iterations=1)
-    mask = cv2.erode(mask, np.ones((5,5), np.uint8), iterations=1)
-    mask = cv2.dilate(mask, np.ones((5,5), np.uint8), iterations=1)
-    cnts, hie = cv2.findContours(mask.copy(), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-    maxc_i = np.argmax([cv2.contourArea(c) for c in cnts])
-    c = cnts[maxc_i]
-    x,y,w,h = cv2.boundingRect(c)
-    cv2.rectangle(rgb_image, (x-30,y-60), (x+w+30,y+h), (0,0,255), 2)
+        if msg.Green > 0:
+            print("Adding Green Wine")
+            center = find_drink(self.rgb_image, gLower, gUpper)
+            pick_up_bottle(msg.Green, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.015, self.cup_world)
+            # self.fa.reset_joints()
 
-    # Create a bounding box which only contains the upper half of the bottle
-    # HSV thresholding the black nozzle
-    nozzle_mask = np.zeros(rgb_image.shape[:2], np.uint8)
-    nozzle_mask[y-60:y+h, x-30:x+w+30] = 255
-    nozzle_mask = cv2.bitwise_and(rgb_image, rgb_image, mask=nozzle_mask)
-    nozzle_hsv = cv2.cvtColor(nozzle_mask, cv2.COLOR_BGR2HSV)
-    nozzle_mask = cv2.inRange(nozzle_hsv, np.array([0,1,0]), np.array([179,255,50]))
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7,7))
-    nozzle_mask = cv2.morphologyEx(nozzle_mask, cv2.MORPH_CLOSE, kernel, iterations=5)
-    nozzle_mask = cv2.morphologyEx(nozzle_mask, cv2.MORPH_OPEN, kernel, iterations=5)
-    nozzle_cnts, _ = cv2.findContours(nozzle_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    nozzle_c = max(nozzle_cnts, key=cv2.contourArea)
-    (nozzle_x, nozzle_y), radius = cv2.minEnclosingCircle(nozzle_c)
-    center = [int(nozzle_x), int(nozzle_y)]
-    radius = int(radius)
-    cv2.circle(rgb_image, center, radius, (255,0,0), 2)
+        if msg.Red > 0:
+            print("Adding Red Wine")
+            center = find_drink(self.rgb_image, rLower, rUpper)
+            pick_up_bottle(msg.Red, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.015, self.cup_world)
+            # self.fa.reset_joints()
 
-    cv2.imshow('img', cv2.resize(rgb_image, (1024,768)))
-    cv2.waitKey(0)
+        self.status.message = "Done. Enjoy!"
+        self.pub.publish(self.status)
 
-    return center
+        reset(self.fa)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--intrinsics_file_path', type=str, default=AZURE_KINECT_INTRINSICS)
-    parser.add_argument('--extrinsics_file_path', type=str, default=AZURE_KINECT_EXTRINSICS) 
-    args = parser.parse_args()
+    def shutdownhook(self):
+        # works better than the rospy.is_shut_down()
+        global ctrl_c
+        self.status.message = "Oops, it's time to close. Franka looks forward to serving you next time!"
+        self.pub.publish(self.status)
+        ctrl_c = True
+
+
+if __name__ == "__main__":
+    ctrl_c = False
+
+    Test()
     
-    print('Starting robot')
-    fa = FrankaArm()    
-
-    print('Opening Grippers')
-    #Open Gripper
-    fa.open_gripper()
-
-    #Reset Pose
-    fa.reset_pose() 
-    #Reset Joints
-    fa.reset_joints()
-
-    cv_bridge = CvBridge()
-    azure_kinect_intrinsics = CameraIntrinsics.load(args.intrinsics_file_path)
-    azure_kinect_to_world_transform = RigidTransform.load(args.extrinsics_file_path)    
-
-    azure_kinect_rgb_image = get_azure_kinect_rgb_image(cv_bridge)
-    azure_kinect_depth_image = get_azure_kinect_depth_image(cv_bridge)
-
-    cv2.imwrite('rgb.png', azure_kinect_rgb_image)
-    cv2.imwrite('depth.png', azure_kinect_depth_image)
-
-    # border = define_borders(azure_kinect_rgb_image)
-    # print(border)
-    border = [[366, 140], [1704, 922]]
-    mask = np.zeros(azure_kinect_rgb_image.shape[:2], np.uint8)
-    mask[border[0][1]:border[1][1], border[0][0]:border[1][0]] = 255
-    rgb_image = cv2.bitwise_and(azure_kinect_rgb_image, azure_kinect_rgb_image, mask=mask)
-
-    center = find_drink(rgb_image, gLower, gUpper)
-
-    object_z_height = 0.2
-    # intermediate_pose_z_height = 0.4
-
-    object_center_point_in_world = get_object_center_point_in_world(center[0],
-                                                                    center[1],
-                                                                    azure_kinect_depth_image, azure_kinect_intrinsics,
-                                                                    azure_kinect_to_world_transform)
-
-    object_center_pose = fa.get_pose()
-    object_center_pose.rotation = object_center_pose.rotation @ np.array([[0,1,0], [0,0,-1], [-1,0,0]])
-    object_center_pose.translation = [object_center_point_in_world[0], object_center_point_in_world[1], object_z_height]
-
-    intermediate_robot_pose = object_center_pose.copy()
-    intermediate_robot_pose.translation = [object_center_point_in_world[0], object_center_point_in_world[1] - 0.1, object_z_height]
-    fa.goto_pose(intermediate_robot_pose, 5)
-    
-    #intermediate 1
-    # intermediate_robot_pose = fa.get_pose()
-    # intermediate_robot_pose.translation = [object_center_point_in_world[0], object_center_point_in_world[1], intermediate_pose_z_height]
-    # fa.goto_pose(intermediate_robot_pose)
-    
-    #intermediate 2
-    # Ry = RigidTransform(rotation=RigidTransform.y_axis_rotation(np.deg2rad(90)), from_frame='franka_tool', to_frame='franka_tool')
-    # intermediate_robot_pose = intermediate_robot_pose * Ry
-    # fa.goto_pose(intermediate_robot_pose)
-
-    #Bottle
-    fa.goto_pose(object_center_pose, 5, force_thresholds=[10, 10, 10, 10, 10, 10])
-
-    fa.publish_joints()
-
-    #Close Gripper
-    fa.goto_gripper(0.045, grasp=True, force=10.0)
-
-    #Lift
-    lift_pose = fa.get_pose()
-    lift_pose.translation[2] += 0.2
-    fa.goto_pose(lift_pose)
-
-    #Move to cup intermediate
-    cup_intermediate_pose = fa.get_pose()
-    cup_intermediate_pose.translation[:2] = [cup_world[0] - 0.1, cup_world[1]]
-    fa.goto_pose(cup_intermediate_pose)
-
-    #Move to cup
-    cup_pose = cup_intermediate_pose.copy()
-    cup_pose.translation[:2] = cup_world[:2]
-    R = RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(179)), from_frame='franka_tool', to_frame='franka_tool')
-    cup_pose = cup_pose * R
-    fa.goto_pose(cup_pose, 5, force_thresholds=[10, 10, 20, 10, 10, 10], buffer_time=5)
-
-    #Return
-    fa.goto_pose(cup_intermediate_pose)
-    fa.goto_pose(lift_pose)
-    fa.goto_pose(object_center_pose, 5, force_thresholds=[10, 10, 20, 10, 10, 10])
-
-    print('Opening Grippers')
-    #Open Gripper
-    fa.open_gripper()
-
-    fa.goto_pose(intermediate_robot_pose)
-
-    #Reset Pose
-    fa.reset_pose() 
-    #Reset Joints
-    fa.reset_joints()
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        print("Shutdown time! Stop the robot")
