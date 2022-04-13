@@ -120,16 +120,16 @@ def pick_up_bottle(shots, initial_pose, fa, center, azure_kinect_depth_image, az
         fa.goto_pose(cup_intermediate_pose)
 
         cup_intermediate_pose_90 = fa.get_pose()
-        cup_intermediate_pose_90 = cup_intermediate_pose_90 * RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(88)), from_frame='franka_tool', to_frame='franka_tool')
+        cup_intermediate_pose_90 = cup_intermediate_pose_90 * RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(80)), from_frame='franka_tool', to_frame='franka_tool')
         fa.goto_pose(cup_intermediate_pose_90, 3)
 
         #Move to cup
         cup_pose = fa.get_pose()
         cup_pose.translation = [cup_world[0] + 0.02, cup_world[1], intermediate_height + 0.12]
         # TODO: rotate around nozzle
-        R = RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(92)), from_frame='franka_tool', to_frame='franka_tool')
+        R = RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(100)), from_frame='franka_tool', to_frame='franka_tool')
         cup_pose = cup_pose * R
-        fa.goto_pose(cup_pose, 10, force_thresholds=[10, 10, 20, 10, 10, 10], buffer_time=5)
+        fa.goto_pose(cup_pose, 5, force_thresholds=[10, 10, 20, 10, 10, 10], buffer_time=5)
 
         fa.goto_pose(cup_intermediate_pose_90)
         

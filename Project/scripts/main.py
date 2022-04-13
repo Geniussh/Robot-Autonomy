@@ -5,6 +5,7 @@ from message_ui.msg import sent_recipe
 from message_ui.msg import reply_msg
 import time
 from test_pick_bottle import *
+from test_pick_cup import mix_drink_n_serve, pick_n_place_cup
 from utils import *
 import cv2
 from cv_bridge import CvBridge
@@ -57,15 +58,15 @@ class Test(object):
         mask = np.zeros(self.azure_kinect_rgb_image.shape[:2], np.uint8)
         mask[border[0][1]:border[1][1], border[0][0]:border[1][0]] = 255
         self.rgb_image = cv2.bitwise_and(self.azure_kinect_rgb_image, self.azure_kinect_rgb_image, mask=mask)
-        self.cup_world = [0.45, 0, 0]  # TODO: record a fixed position
+        self.cup_world = [0.5, 0, 0]  # TODO: record a fixed position
 
 
     def start_mixing_cb(self, msg):
         self.status.message = "Franka starts making your drink..."
         self.pub.publish(self.status)
 
-        object_z_height = 0.19
-        # Testing only. Should be replaced by calling franka
+        cup_center_world_pose = pick_n_place_cup(self.fa, self.cup_world)
+        reset(self.fa)
         
         initial_pose = self.fa.get_pose().copy()
 
@@ -78,14 +79,17 @@ class Test(object):
         if msg.Green > 0:
             print("Adding Green Wine")
             center = find_drink(self.rgb_image, gLower, gUpper)
-            pick_up_bottle(msg.Green, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.015, self.cup_world)
+            pick_up_bottle(msg.Green, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.02, self.cup_world)
             # self.fa.reset_joints()
 
         if msg.Red > 0:
             print("Adding Red Wine")
             center = find_drink(self.rgb_image, rLower, rUpper)
-            pick_up_bottle(msg.Red, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.015, self.cup_world)
+            pick_up_bottle(msg.Red, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.01, self.cup_world)
             # self.fa.reset_joints()
+
+        reset(self.fa)
+        mix_drink_n_serve(self.fa, cup_center_world_pose)
 
         self.status.message = "Done. Enjoy!"
         self.pub.publish(self.status)
