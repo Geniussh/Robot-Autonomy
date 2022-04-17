@@ -85,39 +85,53 @@ def pick_n_place_cup(fa, cup_world):
 
     return cup_center_world_pose
 
+def pick_stick(fa, stick_world_pose):
+    intermediate_pose = fa.get_pose()
+    intermediate_pose.translation[:2] = stick_world_pose[:2]
+    intermediate_pose.translation[2] = 0.3
+    fa.goto_pose(intermediate_pose)
+    
+    intermediate_pose.translation[2] = 0.12
+    fa.goto_pose(intermediate_pose)
+    fa.close_gripper(grasp=True)
+    
 
-def mix_drink_n_serve(fa, cup_center_world_pose):
-    #Grasp Cup
-    cup_pose = fa.get_pose()
-    cup_pose.translation = cup_center_world_pose.translation
-    fa.goto_pose(cup_pose)
-    fa.goto_gripper(0.001, grasp=True, force=60.0)
-
+def goto_cup(fa, cup_center_world_pose, stick_world_pose):
     #Lift
     lift_pose = fa.get_pose()
     lift_pose.translation[2] += 0.2
     fa.goto_pose(lift_pose)
-    
-    #Mix
-    cur_joints = fa.get_joints()
-    angle = 25
-    for rot_delta in [-angle, angle, -angle, angle, 0]:
-        cur_joints_rotated = cur_joints.copy()
-        cur_joints_rotated[6] += np.deg2rad(rot_delta)
-        fa.goto_joints(cur_joints_rotated, 0.5)
 
-    #Serve
-    serve_pose = cup_pose
-    serve_pose.translation[0] = 0.6
-    fa.goto_pose(serve_pose)
+    #Move to cup
+    cup_intermediate_pose = fa.get_pose()
+    cup_intermediate_pose.translation[:2] = [cup_center_world_pose[0] + 0.02, cup_center_world_pose[1]]
+    fa.goto_pose(cup_intermediate_pose)
+    cup_intermediate_pose.translation[2] = 0.15
+    fa.goto_pose(cup_intermediate_pose)
     
-    #Open Gripper
-    fa.open_gripper()
+    # #Mix
+    # cur_pose = fa.get_pose()
+    # cur_pose_trans_x = cur_pose.translation[0]
+    # cur_pose_trans_y = cur_pose.translation[1]
+    # trans_delta = 0.025
+    # for d in [-trans_delta, trans_delta, 0]:
+    #     cur_pose.translation[1] = cur_pose_trans_y + d
+    #     fa.goto_pose(cur_pose, 0.5, buffer_time=0)
+    
+    # for d in [-trans_delta, trans_delta, 0]:
+    #     cur_pose.translation[0] = cur_pose_trans_x + d
+    #     fa.goto_pose(cur_pose, 0.5, buffer_time=0)
 
-    #Reset Pose
-    fa.reset_pose() 
-    #Reset Joints
-    fa.reset_joints()
+    #Return stick
+    # lift_pose = fa.get_pose()
+    # lift_pose.translation[2] += 0.2
+    # fa.goto_pose(lift_pose)
+    # intermediate_pose = fa.get_pose()
+    # intermediate_pose.translation[:2] = stick_world_pose[:2]
+    # fa.goto_pose(intermediate_pose)
+    
+    # intermediate_pose.translation[2] = 0.12
+    # fa.goto_pose(intermediate_pose)
 
 
 if __name__ == '__main__':

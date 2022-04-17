@@ -74,7 +74,7 @@ def find_drink(rgb_image, lower, upper):
     cv2.circle(rgb_image, center, radius, (255,0,0), 2)
 
     cv2.imshow('img', cv2.resize(rgb_image, (1024,768)))
-    cv2.waitKey(1)
+    cv2.waitKey(1000)
 
     return center
 
@@ -103,7 +103,7 @@ def pick_up_bottle(shots, initial_pose, fa, center, azure_kinect_depth_image, az
     fa.publish_joints()
 
     #Close Gripper
-    fa.goto_gripper(0.04, grasp=True, force=60.0)
+    fa.goto_gripper(0.025, grasp=True, force=70.0)
 
     #Lift
     lift_pose = fa.get_pose()
@@ -127,9 +127,9 @@ def pick_up_bottle(shots, initial_pose, fa, center, azure_kinect_depth_image, az
         cup_pose = fa.get_pose()
         cup_pose.translation = [cup_world[0] + 0.02, cup_world[1], intermediate_height + 0.12]
         # TODO: rotate around nozzle
-        R = RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(100)), from_frame='franka_tool', to_frame='franka_tool')
+        R = RigidTransform(rotation=RigidTransform.z_axis_rotation(np.deg2rad(90)), from_frame='franka_tool', to_frame='franka_tool')
         cup_pose = cup_pose * R
-        fa.goto_pose(cup_pose, 5, force_thresholds=[10, 10, 20, 10, 10, 10], buffer_time=5)
+        fa.goto_pose(cup_pose, 8, force_thresholds=[10, 10, 20, 10, 10, 10], buffer_time=2)
 
         fa.goto_pose(cup_intermediate_pose_90)
         

@@ -5,7 +5,8 @@ from message_ui.msg import sent_recipe
 from message_ui.msg import reply_msg
 import time
 from test_pick_bottle import *
-from test_pick_cup import mix_drink_n_serve, pick_n_place_cup
+from test_pick_cup import goto_cup, pick_stick
+from mix import mix
 from utils import *
 import cv2
 from cv_bridge import CvBridge
@@ -52,44 +53,45 @@ class Test(object):
         cv2.imwrite('rgb.png', self.azure_kinect_rgb_image)
         cv2.imwrite('depth.png', self.azure_kinect_depth_image)
 
-        # border = define_borders(azure_kinect_rgb_image)
+        # border = define_borders(self.azure_kinect_rgb_image)
         # print(border)
-        border = [[389, 171], [1635, 875]]
+        border = [[403, 191], [1657, 899]]
         mask = np.zeros(self.azure_kinect_rgb_image.shape[:2], np.uint8)
         mask[border[0][1]:border[1][1], border[0][0]:border[1][0]] = 255
         self.rgb_image = cv2.bitwise_and(self.azure_kinect_rgb_image, self.azure_kinect_rgb_image, mask=mask)
-        self.cup_world = [0.5, 0, 0]  # TODO: record a fixed position
+        self.cup_world = [0.5, 0, 0]
+        self.stick_world = [0.35, -0.3, 0]
 
 
     def start_mixing_cb(self, msg):
         self.status.message = "Franka starts making your drink..."
         self.pub.publish(self.status)
-
-        cup_center_world_pose = pick_n_place_cup(self.fa, self.cup_world)
-        reset(self.fa)
         
         initial_pose = self.fa.get_pose().copy()
 
         if msg.Blue > 0:
-            print("Adding Blue Wine")
+            print("Adding Blueberry Juice")
             center = find_drink(self.rgb_image, bLower, bUpper)
-            pick_up_bottle(msg.Blue, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0, self.cup_world)
+            pick_up_bottle(msg.Blue, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.005, self.cup_world)
             # self.fa.reset_joints()
 
         if msg.Green > 0:
-            print("Adding Green Wine")
+            print("Adding Green Tea")
             center = find_drink(self.rgb_image, gLower, gUpper)
             pick_up_bottle(msg.Green, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.02, self.cup_world)
             # self.fa.reset_joints()
 
         if msg.Red > 0:
-            print("Adding Red Wine")
+            print("Adding Watermelon Juice")
             center = find_drink(self.rgb_image, rLower, rUpper)
             pick_up_bottle(msg.Red, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.01, self.cup_world)
             # self.fa.reset_joints()
 
         reset(self.fa)
-        mix_drink_n_serve(self.fa, cup_center_world_pose)
+        pick_stick(self.fa, self.stick_world)
+        goto_cup(self.fa, self.cup_world, self.stick_world)
+        mix(self.fa)
+        self.fa.open_gripper()
 
         self.status.message = "Done. Enjoy!"
         self.pub.publish(self.status)
