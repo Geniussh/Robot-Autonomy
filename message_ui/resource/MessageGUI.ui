@@ -20,7 +20,7 @@
      <item>
         <widget class="QLabel" name="red_label">
          <property name="text">
-          <string>Red Wine: </string>
+          <string>Watermelon Juice: </string>
          </property>
         </widget>
      </item>
@@ -36,7 +36,7 @@
      <item>
         <widget class="QLabel" name="green_label">
          <property name="text">
-          <string>Green Wine: </string>
+          <string>Green Tea: </string>
          </property>
         </widget>
      </item>
@@ -52,7 +52,7 @@
      <item>
         <widget class="QLabel" name="blue_label">
          <property name="text">
-          <string>Blue Wine: </string>
+          <string>Blueberry Juice: </string>
          </property>
         </widget>
      </item>
@@ -90,7 +90,7 @@
       <item>
         <widget class="QLabel" name="reply">
          <property name="text">
-          <string>-</string>
+          <string>Place your cup first</string>
          </property>
         </widget>
       </item>
