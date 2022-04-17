@@ -131,7 +131,7 @@ def pick_up_bottle(shots, initial_pose, fa, center, azure_kinect_depth_image, az
         cup_pose = cup_pose * R
         fa.goto_pose(cup_pose, 8, force_thresholds=[10, 10, 20, 10, 10, 10], buffer_time=2)
 
-        fa.goto_pose(cup_intermediate_pose_90)
+        fa.goto_pose(cup_intermediate_pose_90, 1.5)
         
     #Return
     fa.goto_pose(cup_intermediate_pose)

@@ -60,7 +60,7 @@ class Test(object):
         mask[border[0][1]:border[1][1], border[0][0]:border[1][0]] = 255
         self.rgb_image = cv2.bitwise_and(self.azure_kinect_rgb_image, self.azure_kinect_rgb_image, mask=mask)
         self.cup_world = [0.5, 0, 0]
-        self.stick_world = [0.35, -0.3, 0]
+        self.stick_world = [0.35, -0.29, 0]
 
 
     def start_mixing_cb(self, msg):
@@ -78,7 +78,7 @@ class Test(object):
         if msg.Green > 0:
             print("Adding Green Tea")
             center = find_drink(self.rgb_image, gLower, gUpper)
-            pick_up_bottle(msg.Green, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.02, self.cup_world)
+            pick_up_bottle(msg.Green, initial_pose, self.fa, center, self.azure_kinect_depth_image, self.azure_kinect_intrinsics, self.azure_kinect_to_world_transform, 0.015, self.cup_world)
             # self.fa.reset_joints()
 
         if msg.Red > 0:
