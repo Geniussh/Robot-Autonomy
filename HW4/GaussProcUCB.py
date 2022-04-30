@@ -75,14 +75,14 @@ for iter in range(45):
 
 	#Collect a new sample.  Using mean, but could also use highest weight one
 	y_mu,y_std=GP.test(policyMu)
-	param = np.random.multivariate_normal(policyMu, policyCov)
-	projPos=ri.RolloutPolicy(param)  #TODO: rollout
+	# param = np.random.multivariate_normal(policyMu, policyCov)
+	projPos=ri.RolloutPolicy(SkillParam[-1])  #TODO: rollout
 	Reward= ri.RewardFunction(projPos)
 	PlotRewards.append(Reward)
 	print(iter, y_mu, y_mu+y_std, Reward)
 
 	#Update Gaussian Process
-	x_train.append(param) #TODO
+	x_train.append(SkillParam[-1]) #TODO
 	y_train.append(Reward) #TODO
 	GP.train(x_train, y_train);
 
